@@ -84,3 +84,54 @@ export class UnauthorizedError extends AppError {
     this.name = 'UnauthorizedError';
   }
 }
+
+export class ForbiddenError extends AppError {
+  constructor(
+    message: string = 'دسترسی غیرمجاز. شما مجوز لازم برای انجام این عملیات را ندارید.',
+    code: string = 'FORBIDDEN',
+  ) {
+    super({
+      message,
+      statusCode: 403,
+      code,
+    });
+    this.name = 'ForbiddenError';
+  }
+}
+
+export class MfaRequiredError extends AppError {
+  constructor(
+    message: string = 'برای دسترسی به این بخش، تکمیل احراز هویت دو مرحله‌ای (MFA) الزامی است.',
+  ) {
+    super({
+      message,
+      statusCode: 403,
+      code: 'MFA_REQUIRED',
+    });
+    this.name = 'MfaRequiredError';
+  }
+}
+
+export class InviteExpiredError extends AppError {
+  constructor(
+    message: string = 'دعوت‌نامه منقضی شده است. لطفاً از مدیر سیستم درخواست دعوت جدید نمایید.',
+  ) {
+    super({
+      message,
+      statusCode: 400,
+      code: 'INVITE_EXPIRED',
+    });
+    this.name = 'InviteExpiredError';
+  }
+}
+
+export class InviteAlreadyUsedError extends AppError {
+  constructor(message: string = 'این دعوت‌نامه قبلاً مورد استفاده قرار گرفته است.') {
+    super({
+      message,
+      statusCode: 400,
+      code: 'INVITE_ALREADY_USED',
+    });
+    this.name = 'InviteAlreadyUsedError';
+  }
+}

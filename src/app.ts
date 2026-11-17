@@ -3,9 +3,13 @@ import type { Pool } from 'pg';
 import type { AppConfig } from './config/index.js';
 import { errorHandler } from './middleware/error.js';
 import { traceMiddleware } from './middleware/trace.js';
-import { createAuthMiddleware } from './middleware/auth.js';
+import {
+  createAuthMiddleware,
+  createInternalAuthMiddleware,
+  requireAccessAdmin,
+} from './middleware/auth.js';
 import { IdentityService } from './modules/identity/service.js';
-import { createIdentityRouter } from './modules/identity/routes.js';
+import { createAdminRouter, createIdentityRouter } from './modules/identity/routes.js';
 import { type SmsSenderPort, InMemorySmsSender } from './modules/identity/ports/sms-sender.js';
 
 export interface AppDependencies {
@@ -38,6 +42,7 @@ export function createApp(deps: AppDependencies): AppContext {
   });
 
   const requireBuyerAuth = createAuthMiddleware(deps.config.jwtSecret);
+  const requireInternalAuth = createInternalAuthMiddleware(identityService);
 
   // Health check endpoint
   app.get('/health', (_req, res) => {
@@ -47,6 +52,9 @@ export function createApp(deps: AppDependencies): AppContext {
   // Mount modules
   const authRouter = createIdentityRouter(identityService, requireBuyerAuth);
   app.use('/api/v1/auth', authRouter);
+
+  const adminRouter = createAdminRouter(identityService, requireInternalAuth, requireAccessAdmin);
+  app.use('/api/v1/admin', adminRouter);
 
   // Global structured error handler
   app.use(errorHandler);
