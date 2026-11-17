@@ -1,5 +1,5 @@
 export type OperationalRole =
-  'seller-mgmt' | 'catalog' | 'order-ops' | 'support' | 'finance' | 'access-admin' | 'staff';
+  'seller-mgmt' | 'catalog' | 'order-ops' | 'support' | 'finance' | 'access-admin';
 
 export const OPERATIONAL_ROLES: readonly OperationalRole[] = [
   'seller-mgmt',
@@ -11,3 +11,7 @@ export const OPERATIONAL_ROLES: readonly OperationalRole[] = [
 ] as const;
 
 export const ACCESS_ADMIN_ROLE: OperationalRole = 'access-admin';
+
+export function isValidOperationalRole(role: string): role is OperationalRole {
+  return (OPERATIONAL_ROLES as readonly string[]).includes(role);
+}

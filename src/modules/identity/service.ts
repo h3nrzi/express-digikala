@@ -16,7 +16,7 @@ import {
   hashPassword,
   verifyPassword,
 } from './domain/passwords.js';
-import type { OperationalRole } from './domain/roles.js';
+import { isValidOperationalRole, type OperationalRole } from './domain/roles.js';
 import { createBuyerToken, generateOtpCode, hashOtpCode, verifyOtpHash } from './domain/tokens.js';
 import type { SmsSenderPort } from './ports/sms-sender.js';
 
@@ -379,14 +379,24 @@ export class IdentityService {
       );
     }
 
-    const roles = params.roles && params.roles.length > 0 ? params.roles : ['staff'];
+    const roles: OperationalRole[] =
+      params.roles && params.roles.length > 0 ? params.roles : ['support'];
+
+    for (const role of roles) {
+      if (!isValidOperationalRole(role)) {
+        throw new ValidationError(`نقش عملیاتی "${role}" نامعتبر است.`, [
+          { field: 'roles', message: `نقش عملیاتی "${role}" نامعتبر است.` },
+        ]);
+      }
+    }
+
     const rawInviteToken = generateInviteToken();
     const tokenHash = hashInviteToken(rawInviteToken);
     const expiresInSeconds = params.expiresInSeconds ?? 86400; // 24 hours default
 
-    // Invalidate any previous unconsumed invite for this email
+    // Invalidate any previous unconsumed invite for this email by expiring it
     await this.pool.query(
-      'UPDATE user_invites SET consumed_at = NOW() WHERE LOWER(email) = $1 AND consumed_at IS NULL;',
+      'UPDATE user_invites SET expires_at = NOW() WHERE LOWER(email) = $1 AND consumed_at IS NULL;',
       [email],
     );
 
@@ -646,17 +656,12 @@ export class IdentityService {
     }
 
     if (session.mfa_verified) {
-      return {
-        success: true,
-        sessionToken: session.session_token,
-        mfaVerified: true,
-        user: {
-          id: session.user_id,
-          email: session.email,
-          phone: session.phone,
-          roles: session.roles,
+      throw new ValidationError('این نشست قبلاً احراز هویت دو مرحله‌ای را تکمیل کرده است.', [
+        {
+          field: 'sessionToken',
+          message: 'این نشست قبلاً احراز هویت دو مرحله‌ای را تکمیل کرده است.',
         },
-      };
+      ]);
     }
 
     // Enforce max 5 attempts per MFA session
