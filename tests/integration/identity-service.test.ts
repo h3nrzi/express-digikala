@@ -51,6 +51,7 @@ describe('IdentityService Integration', () => {
 
     const verifyResult = await service.verifyOtp('09121112233', sentMessage!.code);
     expect(verifyResult.token).toBeDefined();
+    expect(verifyResult.tokenType).toBe('Bearer');
     expect(verifyResult.user.phone).toBe('+989121112233');
     expect(verifyResult.user.role).toBe('buyer');
     expect(verifyResult.user.status).toBe('active');

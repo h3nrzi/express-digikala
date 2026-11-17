@@ -66,6 +66,7 @@ describe('Buyer OTP Auth Integration Tests', () => {
 
       expect(verifyRes.status).toBe(200);
       expect(verifyRes.body.token).toBeDefined();
+      expect(verifyRes.body.tokenType).toBe('Bearer');
       expect(verifyRes.body.user).toMatchObject({
         phone: '+989121234567',
         role: 'buyer',
@@ -101,7 +102,30 @@ describe('Buyer OTP Auth Integration Tests', () => {
         .send({ phone: '+989351234567', code: sentMessage!.code });
 
       expect(verifyRes.status).toBe(200);
+      expect(verifyRes.body.tokenType).toBe('Bearer');
       expect(verifyRes.body.user.phone).toBe('+989351234567');
+    });
+
+    it('supersedes previous OTP codes when a new OTP is requested', async () => {
+      // Send first code
+      await request(app).post('/api/v1/auth/otp/send').send({ phone: '09121234567' });
+      const firstCode = smsSender.getLastMessageFor('+989121234567')!.code;
+
+      // Send second code (superseding the first)
+      await request(app).post('/api/v1/auth/otp/send').send({ phone: '09121234567' });
+      const secondCode = smsSender.getLastMessageFor('+989121234567')!.code;
+
+      // First code should be rejected as invalid/superseded
+      const oldVerifyRes = await request(app)
+        .post('/api/v1/auth/otp/verify')
+        .send({ phone: '09121234567', code: firstCode });
+      expect(oldVerifyRes.status).toBe(400);
+
+      // Second code succeeds
+      const newVerifyRes = await request(app)
+        .post('/api/v1/auth/otp/verify')
+        .send({ phone: '09121234567', code: secondCode });
+      expect(newVerifyRes.status).toBe(200);
     });
   });
 
@@ -116,7 +140,7 @@ describe('Buyer OTP Auth Integration Tests', () => {
         expect(res.body.code).toBe('VALIDATION_ERROR');
         expect(res.body.message).toBeDefined();
         expect(res.body.traceId).toBeDefined();
-        expect(res.body.details).toEqual(
+        expect(res.body.fieldErrors).toEqual(
           expect.arrayContaining([expect.objectContaining({ field: 'phone' })]),
         );
       }
@@ -129,7 +153,7 @@ describe('Buyer OTP Auth Integration Tests', () => {
 
       expect(res.status).toBe(400);
       expect(res.body.code).toBe('VALIDATION_ERROR');
-      expect(res.body.details).toEqual(
+      expect(res.body.fieldErrors).toEqual(
         expect.arrayContaining([expect.objectContaining({ field: 'code' })]),
       );
     });
@@ -167,6 +191,27 @@ describe('Buyer OTP Auth Integration Tests', () => {
       expect(res.body.traceId).toBeDefined();
     });
 
+    it('enforces maximum 5 failed verification attempts before invalidating OTP', async () => {
+      await request(app).post('/api/v1/auth/otp/send').send({ phone: '09121234567' });
+      const validCode = smsSender.getLastMessageFor('+989121234567')!.code;
+
+      // Fail 5 times
+      for (let i = 0; i < 5; i++) {
+        const res = await request(app)
+          .post('/api/v1/auth/otp/verify')
+          .send({ phone: '09121234567', code: '111111' });
+        expect(res.status).toBe(400);
+      }
+
+      // Even if subsequent attempt supplies the right code, it is rejected due to max attempts exceeded
+      const finalRes = await request(app)
+        .post('/api/v1/auth/otp/verify')
+        .send({ phone: '09121234567', code: validCode });
+
+      expect(finalRes.status).toBe(400);
+      expect(finalRes.body.code).toBe('INVALID_OTP');
+    });
+
     it('enforces rate-limiting on OTP send to prevent abuse', async () => {
       const phone = '09129998877';
 
@@ -184,6 +229,22 @@ describe('Buyer OTP Auth Integration Tests', () => {
       expect(breachRes.body.message).toBeDefined();
       expect(breachRes.headers['retry-after']).toBeDefined();
       expect(breachRes.body.traceId).toBeDefined();
+    });
+
+    it('rejects authentication if user account status is suspended or closed', async () => {
+      const phone = '09129990011';
+      // Pre-create suspended user in DB
+      await pool.query(
+        "INSERT INTO user_accounts (phone, status) VALUES ('+989129990011', 'suspended')",
+      );
+
+      await request(app).post('/api/v1/auth/otp/send').send({ phone });
+      const code = smsSender.getLastMessageFor('+989129990011')!.code;
+
+      const verifyRes = await request(app).post('/api/v1/auth/otp/verify').send({ phone, code });
+
+      expect(verifyRes.status).toBe(401);
+      expect(verifyRes.body.code).toBe('UNAUTHORIZED');
     });
   });
 

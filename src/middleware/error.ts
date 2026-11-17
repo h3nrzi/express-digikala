@@ -5,7 +5,7 @@ export interface ErrorResponseBody {
   code: string;
   message: string;
   traceId: string;
-  details?: Array<{ field: string; message: string }>;
+  fieldErrors?: Array<{ field: string; message: string }>;
 }
 
 export function errorHandler(err: Error, req: Request, res: Response, _next: NextFunction): void {
@@ -20,7 +20,7 @@ export function errorHandler(err: Error, req: Request, res: Response, _next: Nex
       code: err.code,
       message: err.message,
       traceId,
-      ...(err.details && err.details.length > 0 ? { details: err.details } : {}),
+      ...(err.fieldErrors && err.fieldErrors.length > 0 ? { fieldErrors: err.fieldErrors } : {}),
     };
 
     res.status(err.statusCode).json(body);

@@ -1,5 +1,11 @@
 import type { Pool } from 'pg';
-import { InvalidOtpError, OtpExpiredError, RateLimitError, ValidationError } from '../../errors.js';
+import {
+  InvalidOtpError,
+  OtpExpiredError,
+  RateLimitError,
+  UnauthorizedError,
+  ValidationError,
+} from '../../errors.js';
 import { normalizeIranianPhoneNumber } from './domain/phone.js';
 import { createBuyerToken, generateOtpCode, hashOtpCode, verifyOtpHash } from './domain/tokens.js';
 import type { SmsSenderPort } from './ports/sms-sender.js';
@@ -20,6 +26,17 @@ export interface UserAccount {
   updatedAt: Date;
 }
 
+export interface VerifyOtpResponse {
+  token: string;
+  tokenType: 'Bearer';
+  user: {
+    id: string;
+    phone: string;
+    role: 'buyer';
+    status: string;
+  };
+}
+
 export class IdentityService {
   constructor(
     private readonly pool: Pool,
@@ -27,11 +44,7 @@ export class IdentityService {
     private readonly config: IdentityServiceConfig,
   ) {}
 
-  /**
-   * Accepts an Iranian phone number, enforces rate limiting,
-   * generates a 6-digit OTP, saves the hash, and dispatches via SMS.
-   */
-  async requestOtp(rawPhone?: string): Promise<{ success: boolean; phone: string }> {
+  private validateAndNormalizePhone(rawPhone?: string): string {
     const phoneResult = normalizeIranianPhoneNumber(rawPhone);
     if (!phoneResult.isValid || !phoneResult.normalized) {
       throw new ValidationError(phoneResult.error ?? 'شماره تلفن همراه نامعتبر است.', [
@@ -41,8 +54,15 @@ export class IdentityService {
         },
       ]);
     }
+    return phoneResult.normalized;
+  }
 
-    const phone = phoneResult.normalized;
+  /**
+   * Accepts an Iranian phone number, enforces rate limiting, invalidates superseded codes,
+   * generates a 6-digit OTP, saves the hash, and dispatches via SMS.
+   */
+  async requestOtp(rawPhone?: string): Promise<{ success: boolean; phone: string }> {
+    const phone = this.validateAndNormalizePhone(rawPhone);
 
     // Check rate limit: count requests within the configured window
     const windowSeconds = this.config.otpRateLimitWindowSeconds;
@@ -67,6 +87,12 @@ export class IdentityService {
         windowSeconds,
       );
     }
+
+    // Invalidate any active, unconsumed OTP requests for this phone so only latest is valid
+    await this.pool.query(
+      'UPDATE otp_requests SET consumed_at = NOW() WHERE phone = $1 AND consumed_at IS NULL;',
+      [phone],
+    );
 
     // Generate code and compute hash
     const code = generateOtpCode();
@@ -93,22 +119,8 @@ export class IdentityService {
   /**
    * Verifies an OTP code and returns a signed short-lived JWT token along with user data.
    */
-  async verifyOtp(
-    rawPhone?: string,
-    rawCode?: string,
-  ): Promise<{
-    token: string;
-    user: { id: string; phone: string; role: 'buyer'; status: string };
-  }> {
-    const phoneResult = normalizeIranianPhoneNumber(rawPhone);
-    if (!phoneResult.isValid || !phoneResult.normalized) {
-      throw new ValidationError(phoneResult.error ?? 'شماره تلفن همراه نامعتبر است.', [
-        {
-          field: 'phone',
-          message: phoneResult.error ?? 'شماره تلفن همراه نامعتبر است.',
-        },
-      ]);
-    }
+  async verifyOtp(rawPhone?: string, rawCode?: string): Promise<VerifyOtpResponse> {
+    const phone = this.validateAndNormalizePhone(rawPhone);
 
     if (!rawCode || typeof rawCode !== 'string' || !/^\d{6}$/.test(rawCode.trim())) {
       throw new ValidationError('کد تأیید باید یک عدد ۶ رقمی معتبر باشد.', [
@@ -119,7 +131,6 @@ export class IdentityService {
       ]);
     }
 
-    const phone = phoneResult.normalized;
     const code = rawCode.trim();
 
     // Fetch the latest unconsumed OTP request for this phone
@@ -144,6 +155,16 @@ export class IdentityService {
       throw new InvalidOtpError('کد تأیید معتبری یافت نشد. لطفاً مجدداً درخواست ارسال کد دهید.');
     }
 
+    // Enforce max verification attempts per OTP code (prevent brute-forcing 6 digits)
+    if (activeOtp.attempts >= 5) {
+      await this.pool.query('UPDATE otp_requests SET consumed_at = NOW() WHERE id = $1', [
+        activeOtp.id,
+      ]);
+      throw new InvalidOtpError(
+        'تعداد تلاش‌های ناموفق بیش از حد مجاز است. لطفاً کد جدید دریافت کنید.',
+      );
+    }
+
     const now = new Date();
     if (new Date(activeOtp.expires_at) < now) {
       throw new OtpExpiredError('کد تأیید منقضی شده است. لطفاً مجدداً درخواست ارسال کد دهید.');
@@ -155,6 +176,15 @@ export class IdentityService {
         activeOtp.id,
       ]);
       throw new InvalidOtpError('کد تأیید واردشده نادرست است.');
+    }
+
+    // Check account status if user already exists
+    const existingUserQuery = 'SELECT status FROM user_accounts WHERE phone = $1;';
+    const existingUserRes = await this.pool.query<{ status: string }>(existingUserQuery, [phone]);
+    if (existingUserRes.rows[0] && existingUserRes.rows[0].status !== 'active') {
+      throw new UnauthorizedError(
+        'حساب کاربری شما غیرفعال یا معلق است. لطفاً با پشتیبانی تماس بگیرید.',
+      );
     }
 
     // Mark OTP as consumed
@@ -188,6 +218,7 @@ export class IdentityService {
 
     return {
       token,
+      tokenType: 'Bearer',
       user: {
         id: user.id,
         phone: user.phone,

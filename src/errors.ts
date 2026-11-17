@@ -6,32 +6,32 @@ export interface FieldErrorDetail {
 export class AppError extends Error {
   public readonly statusCode: number;
   public readonly code: string;
-  public readonly details?: FieldErrorDetail[] | undefined;
+  public readonly fieldErrors?: FieldErrorDetail[] | undefined;
   public readonly retryAfterSeconds?: number | undefined;
 
   constructor(options: {
     message: string;
     statusCode: number;
     code: string;
-    details?: FieldErrorDetail[] | undefined;
+    fieldErrors?: FieldErrorDetail[] | undefined;
     retryAfterSeconds?: number | undefined;
   }) {
     super(options.message);
     this.name = 'AppError';
     this.statusCode = options.statusCode;
     this.code = options.code;
-    this.details = options.details;
+    this.fieldErrors = options.fieldErrors;
     this.retryAfterSeconds = options.retryAfterSeconds;
   }
 }
 
 export class ValidationError extends AppError {
-  constructor(message: string, details?: FieldErrorDetail[] | undefined) {
+  constructor(message: string, fieldErrors?: FieldErrorDetail[] | undefined) {
     super({
       message,
       statusCode: 400,
       code: 'VALIDATION_ERROR',
-      details,
+      fieldErrors,
     });
     this.name = 'ValidationError';
   }

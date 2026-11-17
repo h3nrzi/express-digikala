@@ -4,7 +4,7 @@
 
 **Blocked by:** 01 — Project Scaffold
 
-**Status:** resolved
+**Status:** ready-for-agent
 
 - [x] `POST /api/v1/auth/otp/send` accepts an Iranian-format phone number, generates a short-lived OTP, and delivers it (adapter-stubbed in tests)
 - [x] `POST /api/v1/auth/otp/verify` checks the code and issues a signed short-lived JWT Bearer token on success; rejects expired or wrong codes
