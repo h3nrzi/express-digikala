@@ -1,0 +1,64 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    name: Lint, Typecheck & Test
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: marketplace_user
+          POSTGRES_PASSWORD: marketplace_password
+          POSTGRES_DB: marketplace_dev
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run ESLint
+        run: npm run lint
+
+      - name: Verify Code Formatting
+        run: npm run format:check
+
+      - name: Run TypeScript typecheck
+        run: npm run typecheck
+
+      - name: Initialize Test Database
+        run: |
+          PGPASSWORD=marketplace_password psql -h localhost -U marketplace_user -d marketplace_dev -c "CREATE DATABASE marketplace_test;"
+
+      - name: Run Migrations
+        env:
+          DATABASE_URL: postgresql://marketplace_user:marketplace_password@localhost:5432/marketplace_dev
+        run: npm run migrate:up
+
+      - name: Run Tests (Unit & Integration)
+        env:
+          DATABASE_URL: postgresql://marketplace_user:marketplace_password@localhost:5432/marketplace_dev
+          DATABASE_URL_TEST: postgresql://marketplace_user:marketplace_password@localhost:5432/marketplace_test
+        run: npm test

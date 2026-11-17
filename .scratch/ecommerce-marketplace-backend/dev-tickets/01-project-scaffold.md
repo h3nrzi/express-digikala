@@ -4,11 +4,11 @@
 
 **Blocked by:** None (can start immediately)
 
-**Status:** ready-for-agent
+**Status:** completed
 
-- [ ] TypeScript project initialised with strict mode; ESLint and Prettier configured and passing on an empty codebase
-- [ ] Docker Compose brings up a Postgres instance; connection verified in a smoke test
-- [ ] Migration runner integrated (e.g. db-migrate or similar); at least one baseline migration applied cleanly
-- [ ] Test harness configured (integration test runner pointing at a test database, unit test runner for pure functions); `npm test` exits green on an empty suite
-- [ ] CI pipeline stub runs lint, type-check, and tests on every push; pipeline is green
-- [ ] `README` documents the one-command local setup
+- [x] TypeScript project initialised with strict mode; ESLint and Prettier configured and passing on an empty codebase
+- [x] Docker Compose brings up a Postgres instance; connection verified in a smoke test
+- [x] Migration runner integrated (e.g. db-migrate or similar); at least one baseline migration applied cleanly
+- [x] Test harness configured (integration test runner pointing at a test database, unit test runner for pure functions); `npm test` exits green on an empty suite
+- [x] CI pipeline stub runs lint, type-check, and tests on every push; pipeline is green
+- [x] `README` documents the one-command local setup

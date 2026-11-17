@@ -1,0 +1,25 @@
+name: express-digikala
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: marketplace-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${DB_USER:-marketplace_user}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-marketplace_password}
+      POSTGRES_DB: ${DB_NAME:-marketplace_dev}
+    ports:
+      - '${DB_PORT:-5433}:5432'
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./docker/init-test-db.sh:/docker-entrypoint-initdb.d/init-test-db.sh:ro
+    healthcheck:
+      test:
+        ['CMD-SHELL', 'pg_isready -U ${DB_USER:-marketplace_user} -d ${DB_NAME:-marketplace_dev}']
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_data:
