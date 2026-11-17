@@ -49,26 +49,6 @@ export function createIdentityRouter(
     });
   });
 
-  // Alias POST /api/v1/auth/invite/accept
-  router.post('/invite/accept', async (req: Request, res: Response, next) => {
-    try {
-      const { token, inviteToken, password, fullName } = req.body ?? {};
-      const user = await identityService.setupOperationalAccount({
-        token: token ?? inviteToken,
-        password,
-        fullName,
-      });
-      res.status(200).json({
-        success: true,
-        message:
-          'حساب کاربری با موفقیت راه‌اندازی شد. اکنون می‌توانید با ایمیل و رمز عبور خود وارد شوید.',
-        user,
-      });
-    } catch (err) {
-      next(err);
-    }
-  });
-
   return router;
 }
 

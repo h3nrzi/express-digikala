@@ -16,6 +16,7 @@ import {
   hashPassword,
   verifyPassword,
 } from './domain/passwords.js';
+import type { OperationalRole } from './domain/roles.js';
 import { createBuyerToken, generateOtpCode, hashOtpCode, verifyOtpHash } from './domain/tokens.js';
 import type { SmsSenderPort } from './ports/sms-sender.js';
 
@@ -31,7 +32,7 @@ export interface UserAccount {
   id: string;
   phone: string;
   email?: string | null;
-  roles?: string[];
+  roles?: OperationalRole[];
   status: 'active' | 'locked' | 'suspended' | 'closed';
   createdAt: Date;
   updatedAt: Date;
@@ -51,7 +52,7 @@ export interface VerifyOtpResponse {
 export interface InviteOperationalUserParams {
   email: string;
   phone: string;
-  roles?: string[];
+  roles?: OperationalRole[];
   fullName?: string;
   expiresInSeconds?: number;
 }
@@ -61,7 +62,7 @@ export interface OperationalUserInvite {
   inviteId: string;
   email: string;
   phone: string;
-  roles: string[];
+  roles: OperationalRole[];
   inviteToken: string;
   expiresAt: Date;
 }
@@ -77,7 +78,7 @@ export interface SetupOperationalAccountResponse {
   userId: string;
   email: string;
   phone: string;
-  roles: string[];
+  roles: OperationalRole[];
 }
 
 export interface LoginOperationalUserParams {
@@ -92,7 +93,7 @@ export interface LoginOperationalUserResponse {
     id: string;
     email: string;
     phone: string;
-    roles: string[];
+    roles: OperationalRole[];
   };
 }
 
@@ -109,7 +110,7 @@ export interface VerifyMfaResponse {
     id: string;
     email: string;
     phone: string;
-    roles: string[];
+    roles: OperationalRole[];
   };
 }
 
@@ -117,7 +118,7 @@ export interface InternalSessionUser {
   id: string;
   email: string;
   phone: string;
-  roles: string[];
+  roles: OperationalRole[];
   mfaVerified: boolean;
 }
 
@@ -399,7 +400,7 @@ export class IdentityService {
       id: string;
       email: string;
       phone: string;
-      roles: string[];
+      roles: OperationalRole[];
       expires_at: Date;
     }>(insertInviteQuery, [email, phone, roles, tokenHash, invitedByUserId, expiresInSeconds]);
 
@@ -440,7 +441,7 @@ export class IdentityService {
       id: string;
       email: string;
       phone: string;
-      roles: string[];
+      roles: OperationalRole[];
       expires_at: Date;
       consumed_at: Date | null;
     }>(
@@ -484,7 +485,7 @@ export class IdentityService {
       id: string;
       email: string;
       phone: string;
-      roles: string[];
+      roles: OperationalRole[];
     }>(upsertUserQuery, [
       invite.email,
       invite.phone,
@@ -526,7 +527,7 @@ export class IdentityService {
       email: string;
       phone: string;
       password_hash: string | null;
-      roles: string[];
+      roles: OperationalRole[];
       status: string;
     }>(
       'SELECT id, email, phone, password_hash, roles, status FROM user_accounts WHERE LOWER(email) = $1;',
@@ -617,7 +618,7 @@ export class IdentityService {
       expires_at: Date;
       email: string;
       phone: string;
-      roles: string[];
+      roles: OperationalRole[];
       status: string;
     }>(
       `
@@ -718,7 +719,7 @@ export class IdentityService {
       expires_at: Date;
       email: string;
       phone: string;
-      roles: string[];
+      roles: OperationalRole[];
       status: string;
     }>(
       `

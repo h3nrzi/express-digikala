@@ -2,6 +2,7 @@ import type { NextFunction, Request, Response } from 'express';
 import { ForbiddenError, MfaRequiredError, UnauthorizedError } from '../errors.js';
 import { verifyBuyerToken } from '../modules/identity/domain/tokens.js';
 import type { IdentityService, InternalSessionUser } from '../modules/identity/service.js';
+import { ACCESS_ADMIN_ROLE } from '../modules/identity/domain/roles.js';
 
 export function createAuthMiddleware(jwtSecret: string) {
   return function requireBuyerAuth(req: Request, _res: Response, next: NextFunction): void {
@@ -70,7 +71,7 @@ export function requireAccessAdmin(req: Request, _res: Response, next: NextFunct
   const roles =
     req.internalUser?.roles ?? (req.user as InternalSessionUser | undefined)?.roles ?? [];
 
-  if (!roles.includes('access-admin')) {
+  if (!roles.includes(ACCESS_ADMIN_ROLE)) {
     throw new ForbiddenError('فقط کاربر با نقش راهبر دسترسی مجاز به انجام این عملیات است.');
   }
 
