@@ -135,3 +135,14 @@ export class InviteAlreadyUsedError extends AppError {
     this.name = 'InviteAlreadyUsedError';
   }
 }
+
+export class NotFoundError extends AppError {
+  constructor(message: string = 'منبع مورد نظر یافت نشد.', code: string = 'NOT_FOUND') {
+    super({
+      message,
+      statusCode: 404,
+      code,
+    });
+    this.name = 'NotFoundError';
+  }
+}

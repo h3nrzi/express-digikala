@@ -1,9 +1,11 @@
 import crypto from 'crypto';
 import type { Pool } from 'pg';
 import {
+  ForbiddenError,
   InvalidOtpError,
   InviteAlreadyUsedError,
   InviteExpiredError,
+  NotFoundError,
   OtpExpiredError,
   RateLimitError,
   UnauthorizedError,
@@ -134,6 +136,14 @@ export interface BootstrapAdminParams {
   phone: string;
   password: string;
   fullName?: string;
+}
+
+export interface UpdateUserRolesParams {
+  userId: string;
+  granterUser: InternalSessionUser;
+  roles?: OperationalRole[];
+  grant?: OperationalRole[];
+  revoke?: OperationalRole[];
 }
 
 export class IdentityService {
@@ -805,5 +815,80 @@ export class IdentityService {
     `;
     const result = await this.pool.query<UserAccount>(query, [userId]);
     return result.rows[0] ?? null;
+  }
+
+  /**
+   * Updates an operational user's assigned roles, strictly enforcing the delegation rule:
+   * the granting user cannot grant roles they do not hold.
+   */
+  async updateUserRoles(params: UpdateUserRolesParams): Promise<UserAccount> {
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!params.userId || !uuidRegex.test(params.userId)) {
+      throw new ValidationError('شناسه کاربر نامعتبر است.', [
+        { field: 'userId', message: 'شناسه کاربر نامعتبر است.' },
+      ]);
+    }
+
+    const targetUser = await this.getUserById(params.userId);
+    if (!targetUser) {
+      throw new NotFoundError('کاربر مورد نظر یافت نشد.');
+    }
+
+    if (params.roles === undefined && params.grant === undefined && params.revoke === undefined) {
+      throw new ValidationError('حداقل یکی از پارامترهای roles یا grant/revoke باید ارسال شود.');
+    }
+
+    // Validate any provided role values
+    const rolesToValidate: string[] = [
+      ...(params.roles ?? []),
+      ...(params.grant ?? []),
+      ...(params.revoke ?? []),
+    ];
+
+    for (const role of rolesToValidate) {
+      if (!isValidOperationalRole(role)) {
+        throw new ValidationError(`نقش عملیاتی "${role}" نامعتبر است.`, [
+          { field: 'roles', message: `نقش عملیاتی "${role}" نامعتبر است.` },
+        ]);
+      }
+    }
+
+    let targetRoles: OperationalRole[];
+    const currentRoles: OperationalRole[] = targetUser.roles ?? [];
+
+    if (params.roles !== undefined) {
+      targetRoles = Array.from(new Set(params.roles));
+    } else {
+      let working = [...currentRoles];
+      if (params.grant) {
+        working.push(...params.grant);
+      }
+      if (params.revoke) {
+        working = working.filter((r) => !params.revoke!.includes(r));
+      }
+      targetRoles = Array.from(new Set(working));
+    }
+
+    // Identify newly granted roles (roles present in targetRoles that targetUser did not already have)
+    const grantedRoles = targetRoles.filter((role) => !currentRoles.includes(role));
+
+    // Invariant: The granting user cannot grant roles they do not hold
+    const granterRoles = params.granterUser.roles ?? [];
+    const disallowedGrants = grantedRoles.filter((role) => !granterRoles.includes(role));
+    if (disallowedGrants.length > 0) {
+      throw new ForbiddenError(
+        'کاربر اعطاکننده نمی‌تواند نقشی را که خود دارا نیست، به کاربر دیگری اختصاص دهد.',
+      );
+    }
+
+    const query = `
+      UPDATE user_accounts
+      SET roles = $1, updated_at = NOW()
+      WHERE id = $2
+      RETURNING id, phone, email, roles, status, created_at AS "createdAt", updated_at AS "updatedAt";
+    `;
+
+    const result = await this.pool.query<UserAccount>(query, [targetRoles, params.userId]);
+    return result.rows[0]!;
   }
 }

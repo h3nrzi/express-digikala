@@ -2,7 +2,7 @@ import type { NextFunction, Request, Response } from 'express';
 import { ForbiddenError, MfaRequiredError, UnauthorizedError } from '../errors.js';
 import { verifyBuyerToken } from '../modules/identity/domain/tokens.js';
 import type { IdentityService, InternalSessionUser } from '../modules/identity/service.js';
-import { ACCESS_ADMIN_ROLE } from '../modules/identity/domain/roles.js';
+import { ACCESS_ADMIN_ROLE, type OperationalRole } from '../modules/identity/domain/roles.js';
 
 export function createAuthMiddleware(jwtSecret: string) {
   return function requireBuyerAuth(req: Request, _res: Response, next: NextFunction): void {
@@ -67,13 +67,45 @@ export function createInternalAuthMiddleware(identityService: IdentityService) {
   };
 }
 
-export function requireAccessAdmin(req: Request, _res: Response, next: NextFunction): void {
-  const roles =
-    req.internalUser?.roles ?? (req.user as InternalSessionUser | undefined)?.roles ?? [];
+/**
+ * Role middleware factory that verifies the authenticated internal user possesses at least one
+ * of the allowed operational roles, while strictly enforcing Separation of Duties (SoD):
+ * the `access-admin` role is explicitly barred from financial and order operations.
+ */
+export function requireRole(...allowedRoles: OperationalRole[]) {
+  return function roleMiddleware(req: Request, _res: Response, next: NextFunction): void {
+    const user = req.internalUser ?? (req.user as InternalSessionUser | undefined);
 
-  if (!roles.includes(ACCESS_ADMIN_ROLE)) {
-    throw new ForbiddenError('فقط کاربر با نقش راهبر دسترسی مجاز به انجام این عملیات است.');
-  }
+    if (!user) {
+      throw new UnauthorizedError('توکن احراز هویت ارسال نشده است.');
+    }
 
-  next();
+    if (!user.mfaVerified) {
+      throw new MfaRequiredError(
+        'برای دسترسی به این بخش، تکمیل احراز هویت دو مرحله‌ای (MFA) الزامی است.',
+      );
+    }
+
+    const userRoles = user.roles ?? [];
+
+    // Critical Separation of Duties (SoD) invariant:
+    // access-admin cannot perform financial or order operations even if assigned both roles.
+    const isRestrictedRouteGroup = allowedRoles.some(
+      (role) => role === 'finance' || role === 'order-ops',
+    );
+    if (isRestrictedRouteGroup && userRoles.includes(ACCESS_ADMIN_ROLE)) {
+      throw new ForbiddenError(
+        'کاربران با نقش راهبر دسترسی مجاز به عملیات مالی یا سفارشات نیستند.',
+      );
+    }
+
+    const hasAllowedRole = allowedRoles.some((role) => userRoles.includes(role));
+    if (!hasAllowedRole) {
+      throw new ForbiddenError('دسترسی غیرمجاز. شما مجوز لازم برای انجام این عملیات را ندارید.');
+    }
+
+    next();
+  };
 }
+
+export const requireAccessAdmin = requireRole(ACCESS_ADMIN_ROLE);
