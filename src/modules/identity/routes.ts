@@ -218,9 +218,8 @@ export function createAdminRouter(
 
   router.use('/users', usersRouter);
 
-  // Operational Route Groups (seller-mgmt, catalog, order-ops, support, finance)
+  // Operational Route Groups (catalog, order-ops, support, finance)
   const operationalGroups: Array<{ path: string; role: OperationalRole }> = [
-    { path: '/sellers', role: 'seller-mgmt' },
     { path: '/catalog', role: 'catalog' },
     { path: '/orders', role: 'order-ops' },
     { path: '/support', role: 'support' },

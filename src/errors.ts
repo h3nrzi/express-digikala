@@ -146,3 +146,31 @@ export class NotFoundError extends AppError {
     this.name = 'NotFoundError';
   }
 }
+
+export class ConflictError extends AppError {
+  constructor(
+    message: string = 'منبع با مشخصات ارائه‌شده از قبل در سیستم وجود دارد.',
+    code: string = 'CONFLICT',
+  ) {
+    super({
+      message,
+      statusCode: 409,
+      code,
+    });
+    this.name = 'ConflictError';
+  }
+}
+
+export class InvalidStateTransitionError extends AppError {
+  constructor(
+    message: string = 'تغییر وضعیت درخواستی مجاز نمی‌باشد.',
+    code: string = 'INVALID_STATE_TRANSITION',
+  ) {
+    super({
+      message,
+      statusCode: 400,
+      code,
+    });
+    this.name = 'InvalidStateTransitionError';
+  }
+}

@@ -11,16 +11,20 @@ import {
 import { IdentityService } from './modules/identity/service.js';
 import { createAdminRouter, createIdentityRouter } from './modules/identity/routes.js';
 import { type SmsSenderPort, InMemorySmsSender } from './modules/identity/ports/sms-sender.js';
+import { SellerService } from './modules/seller/service.js';
+import { createSellerAdminRouter } from './modules/seller/routes.js';
 
 export interface AppDependencies {
   pool: Pool;
   config: AppConfig;
   smsSender?: SmsSenderPort;
+  sellerService?: SellerService;
 }
 
 export interface AppContext {
   app: Express;
   identityService: IdentityService;
+  sellerService: SellerService;
   smsSender: SmsSenderPort;
 }
 
@@ -40,6 +44,7 @@ export function createApp(deps: AppDependencies): AppContext {
     otpRateLimitMaxAttempts: deps.config.otpRateLimitMaxAttempts,
     otpRateLimitWindowSeconds: deps.config.otpRateLimitWindowSeconds,
   });
+  const sellerService = deps.sellerService ?? new SellerService(deps.pool);
 
   const requireBuyerAuth = createAuthMiddleware(deps.config.jwtSecret);
   const requireInternalAuth = createInternalAuthMiddleware(identityService);
@@ -54,6 +59,8 @@ export function createApp(deps: AppDependencies): AppContext {
   app.use('/api/v1/auth', authRouter);
 
   const adminRouter = createAdminRouter(identityService, requireInternalAuth, requireAccessAdmin);
+  const sellerRouter = createSellerAdminRouter(sellerService, requireInternalAuth);
+  adminRouter.use('/sellers', sellerRouter);
   app.use('/api/v1/admin', adminRouter);
 
   // Global structured error handler
@@ -62,6 +69,7 @@ export function createApp(deps: AppDependencies): AppContext {
   return {
     app,
     identityService,
+    sellerService,
     smsSender,
   };
 }
