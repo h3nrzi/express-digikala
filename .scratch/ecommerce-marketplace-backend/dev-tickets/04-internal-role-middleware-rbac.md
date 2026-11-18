@@ -4,10 +4,10 @@
 
 **Blocked by:** 03 — Internal User Invite & Personal Account Auth
 
-**Status:** ready-for-agent
+**Status:** completed
 
-- [ ] Six roles defined and stored on user records: `seller-mgmt`, `catalog`, `order-ops`, `support`, `finance`, `access-admin`
-- [ ] Role middleware factory (`requireRole(...roles)`) applied to every internal route group
-- [ ] `access-admin` role explicitly excluded from `finance` and `order-ops` route groups even if assigned both
-- [ ] `POST /api/v1/admin/users/:id/roles` (access-admin only) grants or revokes roles; the granting user cannot grant roles they do not hold
-- [ ] Integration tests: each role can reach its own routes and is rejected from every other role's routes; `access-admin` cannot reach finance or order-ops routes; unauthenticated requests rejected everywhere
+- [x] Six roles defined and stored on user records: `seller-mgmt`, `catalog`, `order-ops`, `support`, `finance`, `access-admin`
+- [x] Role middleware factory (`requireRole(...roles)`) applied to every internal route group
+- [x] `access-admin` role explicitly excluded from `finance` and `order-ops` route groups even if assigned both
+- [x] `POST /api/v1/admin/users/:id/roles` (access-admin only) grants or revokes roles; the granting user cannot grant roles they do not hold
+- [x] Integration tests: each role can reach its own routes and is rejected from every other role's routes; `access-admin` cannot reach finance or order-ops routes; unauthenticated requests rejected everywhere
