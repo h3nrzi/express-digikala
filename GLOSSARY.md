@@ -27,7 +27,7 @@ An individual who uses a personal user account and authorized roles to perform i
 A set of access permissions for an area of internal marketplace operations, such as seller management, catalog, orders and support, finance, or access management. An operational user may have multiple roles.
 
 **Access Administrator**:
-An operational user authorized to invite users and grant or revoke roles. This role alone does not grant permission to perform order or financial operations.
+An operational user authorized to invite users and grant or revoke roles. Under strict Separation of Duties (SoD), this role explicitly cannot perform order or financial operations, even if assigned both roles.
 
 **Sales Commission**:
 The amount the platform charges a third-party seller for a marketplace sale. In the MVP, it is a percentage of the net amount for the quantity the buyer keeps; shipping costs and taxes are excluded from the calculation base.

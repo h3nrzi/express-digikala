@@ -80,6 +80,7 @@ describe('RBAC & Internal Role Middleware Integration', () => {
 
   describe('Unauthenticated and Unverified Access Rejections', () => {
     const internalEndpoints = [
+      { method: 'get', path: '/api/v1/admin/me' },
       { method: 'get', path: '/api/v1/admin/sellers' },
       { method: 'get', path: '/api/v1/admin/catalog' },
       { method: 'get', path: '/api/v1/admin/orders' },
@@ -129,30 +130,58 @@ describe('RBAC & Internal Role Middleware Integration', () => {
   });
 
   describe('Operational Role Matrix & Boundary Enforcement', () => {
-    const roleRoutes: Array<{ role: OperationalRole; path: string; name: string }> = [
-      { role: 'seller-mgmt', path: '/api/v1/admin/sellers', name: 'Seller Management' },
-      { role: 'catalog', path: '/api/v1/admin/catalog', name: 'Catalog' },
-      { role: 'order-ops', path: '/api/v1/admin/orders', name: 'Order Operations' },
-      { role: 'support', path: '/api/v1/admin/support', name: 'Support' },
-      { role: 'finance', path: '/api/v1/admin/finance', name: 'Finance' },
+    const roleRoutes: Array<{
+      role: OperationalRole;
+      method: 'get' | 'post';
+      path: string;
+      body?: Record<string, unknown>;
+      name: string;
+    }> = [
+      {
+        role: 'seller-mgmt',
+        method: 'get',
+        path: '/api/v1/admin/sellers',
+        name: 'Seller Management',
+      },
+      { role: 'catalog', method: 'get', path: '/api/v1/admin/catalog', name: 'Catalog' },
+      { role: 'order-ops', method: 'get', path: '/api/v1/admin/orders', name: 'Order Operations' },
+      { role: 'support', method: 'get', path: '/api/v1/admin/support', name: 'Support' },
+      { role: 'finance', method: 'get', path: '/api/v1/admin/finance', name: 'Finance' },
+      {
+        role: 'access-admin',
+        method: 'post',
+        path: '/api/v1/admin/users/invite',
+        body: { email: 'cross.invite@marketplace.ir', phone: '09128881122' },
+        name: 'Access Admin',
+      },
     ];
 
     it('allows each single role to reach its dedicated route group', async () => {
       for (let i = 0; i < roleRoutes.length; i++) {
-        const { role, path } = roleRoutes[i]!;
+        const target = roleRoutes[i]!;
         const user = await createVerifiedUserWithRoles(
-          `${role}@marketplace.ir`,
+          `${target.role}@marketplace.ir`,
           `+9891200000${i + 10}`,
-          [role],
+          [target.role],
         );
 
-        const res = await request(app)
-          .get(path)
-          .set('Authorization', `Bearer ${user.sessionToken}`);
+        if (target.method === 'get') {
+          const res = await request(app)
+            .get(target.path)
+            .set('Authorization', `Bearer ${user.sessionToken}`);
 
-        expect(res.status).toBe(200);
-        expect(res.body.status).toBe('ok');
-        expect(res.body.group).toBe(role);
+          expect(res.status).toBe(200);
+          expect(res.body.status).toBe('ok');
+          expect(res.body.group).toBe(target.role);
+        } else {
+          const res = await request(app)
+            .post(target.path)
+            .set('Authorization', `Bearer ${user.sessionToken}`)
+            .send(target.body);
+
+          expect(res.status).toBe(201);
+          expect(res.body.success).toBe(true);
+        }
       }
     });
 
@@ -167,9 +196,12 @@ describe('RBAC & Internal Role Middleware Integration', () => {
 
         for (const targetRoute of roleRoutes) {
           if (targetRoute.role !== currentUserDef.role) {
-            const res = await request(app)
-              .get(targetRoute.path)
-              .set('Authorization', `Bearer ${user.sessionToken}`);
+            const req =
+              targetRoute.method === 'get'
+                ? request(app).get(targetRoute.path)
+                : request(app).post(targetRoute.path).send(targetRoute.body);
+
+            const res = await req.set('Authorization', `Bearer ${user.sessionToken}`);
 
             expect(res.status).toBe(403);
             expect(res.body.code).toBe('FORBIDDEN');

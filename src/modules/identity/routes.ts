@@ -4,6 +4,7 @@ import type { RequestHandler } from 'express';
 import { UnauthorizedError, ValidationError } from '../../errors.js';
 import type { BuyerTokenPayload } from './domain/tokens.js';
 import { requireRole } from '../../middleware/auth.js';
+import { OPERATIONAL_ROLES, type OperationalRole } from './domain/roles.js';
 
 export function createIdentityRouter(
   identityService: IdentityService,
@@ -123,19 +124,24 @@ export function createAdminRouter(
     }
   });
 
-  // GET /api/v1/admin/me (Protected internal route)
-  router.get('/me', requireInternalAuth, (req: Request, res: Response) => {
-    const user = req.internalUser ?? (req.user as InternalSessionUser);
-    res.status(200).json({
-      user: {
-        id: user.id,
-        email: user.email,
-        phone: user.phone,
-        roles: user.roles,
-        mfaVerified: user.mfaVerified,
-      },
-    });
-  });
+  // GET /api/v1/admin/me (Protected internal route, guarded by operational role check)
+  router.get(
+    '/me',
+    requireInternalAuth,
+    requireRole(...OPERATIONAL_ROLES),
+    (req: Request, res: Response) => {
+      const user = req.internalUser ?? (req.user as InternalSessionUser);
+      res.status(200).json({
+        user: {
+          id: user.id,
+          email: user.email,
+          phone: user.phone,
+          roles: user.roles,
+          mfaVerified: user.mfaVerified,
+        },
+      });
+    },
+  );
 
   // ---------------------------------------------------------------------------
   // Internal Route Groups (RBAC guarded)
@@ -172,12 +178,19 @@ export function createAdminRouter(
       const rawId = req.params.id;
       const id = Array.isArray(rawId) ? rawId[0] : rawId;
       if (!id) {
-        throw new ValidationError('شناسه کاربر نامعتبر است.');
+        throw new ValidationError('شناسه کاربر الزامی است.', [
+          { field: 'id', message: 'شناسه کاربر الزامی است.' },
+        ]);
       }
 
-      const { roles, grant, revoke } = req.body ?? {};
-      const granter = req.internalUser ?? (req.user as InternalSessionUser | undefined);
+      const { roles } = req.body ?? {};
+      if (!roles) {
+        throw new ValidationError('فیلد roles الزامی است.', [
+          { field: 'roles', message: 'فیلد roles الزامی است.' },
+        ]);
+      }
 
+      const granter = req.internalUser ?? (req.user as InternalSessionUser | undefined);
       if (!granter) {
         throw new UnauthorizedError('توکن احراز هویت ارسال نشده است.');
       }
@@ -186,8 +199,6 @@ export function createAdminRouter(
         userId: id,
         granterUser: granter,
         roles,
-        grant,
-        revoke,
       });
 
       res.status(200).json({
@@ -207,45 +218,23 @@ export function createAdminRouter(
 
   router.use('/users', usersRouter);
 
-  // Group: Seller Management (seller-mgmt role)
-  const sellersRouter = Router();
-  sellersRouter.use(requireInternalAuth, requireRole('seller-mgmt'));
-  sellersRouter.get('/', (_req: Request, res: Response) => {
-    res.status(200).json({ status: 'ok', group: 'seller-mgmt' });
-  });
-  router.use('/sellers', sellersRouter);
+  // Operational Route Groups (seller-mgmt, catalog, order-ops, support, finance)
+  const operationalGroups: Array<{ path: string; role: OperationalRole }> = [
+    { path: '/sellers', role: 'seller-mgmt' },
+    { path: '/catalog', role: 'catalog' },
+    { path: '/orders', role: 'order-ops' },
+    { path: '/support', role: 'support' },
+    { path: '/finance', role: 'finance' },
+  ];
 
-  // Group: Catalog Management (catalog role)
-  const catalogRouter = Router();
-  catalogRouter.use(requireInternalAuth, requireRole('catalog'));
-  catalogRouter.get('/', (_req: Request, res: Response) => {
-    res.status(200).json({ status: 'ok', group: 'catalog' });
-  });
-  router.use('/catalog', catalogRouter);
-
-  // Group: Order Operations (order-ops role)
-  const ordersRouter = Router();
-  ordersRouter.use(requireInternalAuth, requireRole('order-ops'));
-  ordersRouter.get('/', (_req: Request, res: Response) => {
-    res.status(200).json({ status: 'ok', group: 'order-ops' });
-  });
-  router.use('/orders', ordersRouter);
-
-  // Group: Support Operations (support role)
-  const supportRouter = Router();
-  supportRouter.use(requireInternalAuth, requireRole('support'));
-  supportRouter.get('/', (_req: Request, res: Response) => {
-    res.status(200).json({ status: 'ok', group: 'support' });
-  });
-  router.use('/support', supportRouter);
-
-  // Group: Finance Operations (finance role)
-  const financeRouter = Router();
-  financeRouter.use(requireInternalAuth, requireRole('finance'));
-  financeRouter.get('/', (_req: Request, res: Response) => {
-    res.status(200).json({ status: 'ok', group: 'finance' });
-  });
-  router.use('/finance', financeRouter);
+  for (const group of operationalGroups) {
+    const groupRouter = Router();
+    groupRouter.use(requireInternalAuth, requireRole(group.role));
+    groupRouter.get('/', (_req: Request, res: Response) => {
+      res.status(200).json({ status: 'ok', group: group.role });
+    });
+    router.use(group.path, groupRouter);
+  }
 
   return router;
 }

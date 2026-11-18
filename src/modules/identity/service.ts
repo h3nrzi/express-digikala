@@ -141,9 +141,7 @@ export interface BootstrapAdminParams {
 export interface UpdateUserRolesParams {
   userId: string;
   granterUser: InternalSessionUser;
-  roles?: OperationalRole[];
-  grant?: OperationalRole[];
-  revoke?: OperationalRole[];
+  roles: OperationalRole[];
 }
 
 export class IdentityService {
@@ -834,18 +832,13 @@ export class IdentityService {
       throw new NotFoundError('کاربر مورد نظر یافت نشد.');
     }
 
-    if (params.roles === undefined && params.grant === undefined && params.revoke === undefined) {
-      throw new ValidationError('حداقل یکی از پارامترهای roles یا grant/revoke باید ارسال شود.');
+    if (!Array.isArray(params.roles)) {
+      throw new ValidationError('فیلد roles باید به صورت آرایه‌ای از نقش‌ها ارسال شود.', [
+        { field: 'roles', message: 'فیلد roles باید به صورت آرایه‌ای از نقش‌ها ارسال شود.' },
+      ]);
     }
 
-    // Validate any provided role values
-    const rolesToValidate: string[] = [
-      ...(params.roles ?? []),
-      ...(params.grant ?? []),
-      ...(params.revoke ?? []),
-    ];
-
-    for (const role of rolesToValidate) {
+    for (const role of params.roles) {
       if (!isValidOperationalRole(role)) {
         throw new ValidationError(`نقش عملیاتی "${role}" نامعتبر است.`, [
           { field: 'roles', message: `نقش عملیاتی "${role}" نامعتبر است.` },
@@ -853,21 +846,8 @@ export class IdentityService {
       }
     }
 
-    let targetRoles: OperationalRole[];
+    const targetRoles = Array.from(new Set(params.roles));
     const currentRoles: OperationalRole[] = targetUser.roles ?? [];
-
-    if (params.roles !== undefined) {
-      targetRoles = Array.from(new Set(params.roles));
-    } else {
-      let working = [...currentRoles];
-      if (params.grant) {
-        working.push(...params.grant);
-      }
-      if (params.revoke) {
-        working = working.filter((r) => !params.revoke!.includes(r));
-      }
-      targetRoles = Array.from(new Set(working));
-    }
 
     // Identify newly granted roles (roles present in targetRoles that targetUser did not already have)
     const grantedRoles = targetRoles.filter((role) => !currentRoles.includes(role));

@@ -181,6 +181,29 @@ describe('IdentityService.updateUserRoles Seam', () => {
     ).rejects.toThrow(ValidationError);
   });
 
+  it('throws ValidationError with fieldErrors when roles is not an array', async () => {
+    const granter: InternalSessionUser = {
+      id: '00000000-0000-0000-0000-000000000001',
+      email: 'admin@marketplace.ir',
+      phone: '+989121110001',
+      roles: ['access-admin'],
+      mfaVerified: true,
+    };
+
+    const targetUser = await createTestUser('target@marketplace.ir', '+989120000002', []);
+
+    await expect(
+      identityService.updateUserRoles({
+        userId: targetUser.id,
+        granterUser: granter,
+        roles: 'not-an-array' as unknown as OperationalRole[],
+      }),
+    ).rejects.toMatchObject({
+      code: 'VALIDATION_ERROR',
+      fieldErrors: [{ field: 'roles' }],
+    });
+  });
+
   it('throws ValidationError when role name is invalid', async () => {
     const granter: InternalSessionUser = {
       id: '00000000-0000-0000-0000-000000000001',
