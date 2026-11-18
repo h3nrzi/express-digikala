@@ -14,10 +14,19 @@ describe('recordAuditEvent Unit Validations', () => {
     }),
   };
 
-  it('rejects recording an event with missing or empty actorType', async () => {
+  it('rejects recording an event with missing or invalid actorType', async () => {
     await expect(
       recordAuditEvent(fakeDb, {
-        actorType: '',
+        actorType: '' as unknown as 'system',
+        action: 'seller.created',
+        entityType: 'seller',
+        entityId: 'seller-1',
+      }),
+    ).rejects.toThrow(ValidationError);
+
+    await expect(
+      recordAuditEvent(fakeDb, {
+        actorType: 'invalid-actor' as unknown as 'system',
         action: 'seller.created',
         entityType: 'seller',
         entityId: 'seller-1',

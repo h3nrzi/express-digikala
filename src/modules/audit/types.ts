@@ -7,7 +7,7 @@ export interface Queryable {
   ): Promise<pg.QueryResult<R>>;
 }
 
-export type ActorType = 'system' | 'user' | string;
+export type ActorType = 'system' | 'user';
 
 export interface RecordAuditEventParams {
   actorType: ActorType;
@@ -19,13 +19,12 @@ export interface RecordAuditEventParams {
   newValue?: Record<string, unknown> | unknown[] | null | undefined;
   reason?: string | null | undefined;
   linkedEventId?: string | null | undefined;
-  occurredAt?: Date | undefined;
 }
 
 export interface AuditEvent {
   id: string;
   occurredAt: Date;
-  actorType: string;
+  actorType: ActorType;
   actorId: string | null;
   action: string;
   entityType: string;
@@ -39,7 +38,7 @@ export interface AuditEvent {
 export interface AuditEventRow {
   id: string;
   occurred_at: Date;
-  actor_type: string;
+  actor_type: ActorType;
   actor_id: string | null;
   action: string;
   entity_type: string;
@@ -48,9 +47,4 @@ export interface AuditEventRow {
   new_value: Record<string, unknown> | unknown[] | null;
   reason: string | null;
   linked_event_id: string | null;
-}
-
-export interface FindAuditEventsOptions {
-  order?: 'ASC' | 'DESC' | undefined;
-  limit?: number | undefined;
 }

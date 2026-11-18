@@ -22,8 +22,10 @@ export async function recordAuditEvent(
   params: RecordAuditEventParams,
 ): Promise<AuditEvent> {
   const actorType = params.actorType?.trim();
-  if (!actorType) {
-    throw new ValidationError('actorType is required for recording an audit event');
+  if (!actorType || (actorType !== 'system' && actorType !== 'user')) {
+    throw new ValidationError(
+      "actorType is required and must be either 'system' or 'user' for recording an audit event",
+    );
   }
 
   const action = params.action?.trim();
@@ -55,66 +57,32 @@ export async function recordAuditEvent(
       ? JSON.stringify(params.newValue)
       : null;
 
-  const occurredAt = params.occurredAt ?? null;
-
-  let insertQuery: string;
-  let values: unknown[];
-
-  if (occurredAt) {
-    insertQuery = `
-      INSERT INTO audit_events (
-        actor_type,
-        actor_id,
-        action,
-        entity_type,
-        entity_id,
-        previous_value,
-        new_value,
-        reason,
-        linked_event_id,
-        occurred_at
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-      RETURNING *;
-    `;
-    values = [
-      actorType,
-      actorId,
+  const insertQuery = `
+    INSERT INTO audit_events (
+      actor_type,
+      actor_id,
       action,
-      entityType,
-      entityId,
-      previousValueJson,
-      newValueJson,
+      entity_type,
+      entity_id,
+      previous_value,
+      new_value,
       reason,
-      linkedEventId,
-      occurredAt,
-    ];
-  } else {
-    insertQuery = `
-      INSERT INTO audit_events (
-        actor_type,
-        actor_id,
-        action,
-        entity_type,
-        entity_id,
-        previous_value,
-        new_value,
-        reason,
-        linked_event_id
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-      RETURNING *;
-    `;
-    values = [
-      actorType,
-      actorId,
-      action,
-      entityType,
-      entityId,
-      previousValueJson,
-      newValueJson,
-      reason,
-      linkedEventId,
-    ];
-  }
+      linked_event_id
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+    RETURNING *;
+  `;
+
+  const values = [
+    actorType,
+    actorId,
+    action,
+    entityType,
+    entityId,
+    previousValueJson,
+    newValueJson,
+    reason,
+    linkedEventId,
+  ];
 
   const result = await db.query<AuditEventRow>(insertQuery, values);
   const row = result.rows[0];

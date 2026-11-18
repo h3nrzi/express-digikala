@@ -16,7 +16,16 @@ describe('Audit Trail Database Immutability & Shared Writer', () => {
   beforeAll(async () => {
     pool = createDbPool({ connectionString: testDbUrl });
 
-    // Ensure all migrations up to audit_events have executed
+    // Refresh migration to ensure latest trigger definition and check constraints are applied
+    await runner({
+      databaseUrl: testDbUrl,
+      dir: 'migrations',
+      direction: 'down',
+      count: 1,
+      migrationsTable: 'pgmigrations',
+      verbose: false,
+    });
+
     await runner({
       databaseUrl: testDbUrl,
       dir: 'migrations',
@@ -53,7 +62,7 @@ describe('Audit Trail Database Immutability & Shared Writer', () => {
       expect(columnNames).toContain('linked_event_id');
     });
 
-    it('rejects direct SQL UPDATE queries via database-level trigger', async () => {
+    it('rejects direct SQL UPDATE queries via statement-level trigger even if zero rows match', async () => {
       const event = await recordAuditEvent(pool, {
         actorType: 'system',
         actorId: 'sys-immutability-1',
@@ -63,28 +72,50 @@ describe('Audit Trail Database Immutability & Shared Writer', () => {
         reason: 'Initial onboarding',
       });
 
+      // Target exact row
       await expect(
         pool.query(`UPDATE audit_events SET reason = 'tampered reason' WHERE id = $1`, [event.id]),
       ).rejects.toThrow(/append-only/i);
+
+      // Target zero rows (statement-level trigger blocks statement unconditionally)
+      await expect(
+        pool.query(`UPDATE audit_events SET reason = 'tampered' WHERE 1 = 0`),
+      ).rejects.toThrow(/append-only/i);
     });
 
-    it('rejects direct SQL DELETE queries via database-level trigger', async () => {
+    it('rejects direct SQL DELETE queries via statement-level trigger even if zero rows match', async () => {
       const event = await recordAuditEvent(pool, {
         actorType: 'user',
         actorId: 'user-immutability-1',
         action: 'order.cancelled',
-        entityType: 'order',
-        entityId: 'order-immutability-1',
+        entityType: 'buyer_order',
+        entityId: 'ord-immutability-1',
         reason: 'Buyer cancellation',
       });
 
+      // Target exact row
       await expect(
         pool.query(`DELETE FROM audit_events WHERE id = $1`, [event.id]),
       ).rejects.toThrow(/append-only/i);
+
+      // Target zero rows
+      await expect(pool.query(`DELETE FROM audit_events WHERE 1 = 0`)).rejects.toThrow(
+        /append-only/i,
+      );
     });
 
     it('rejects direct SQL TRUNCATE queries via database-level trigger', async () => {
       await expect(pool.query(`TRUNCATE TABLE audit_events`)).rejects.toThrow(/append-only/i);
+    });
+
+    it('enforces database check constraint rejecting invalid actor_type', async () => {
+      await expect(
+        pool.query(`
+          INSERT INTO audit_events (
+            actor_type, action, entity_type, entity_id
+          ) VALUES ('invalid_actor', 'seller.created', 'seller', 's-1')
+        `),
+      ).rejects.toThrow(/chk_audit_events_actor_type/i);
     });
   });
 
@@ -135,11 +166,11 @@ describe('Audit Trail Database Immutability & Shared Writer', () => {
         actorType: 'user',
         actorId: 'support-agent-1',
         action: 'order.address_updated',
-        entityType: 'order',
+        entityType: 'buyer_order',
         entityId,
         previousValue: { postalCode: '1111111111' },
         newValue: { postalCode: '2222222222' },
-        reason: 'Customer requested address correction',
+        reason: 'Buyer requested address correction',
       });
 
       // 2. Corrective event linking back to initial event
@@ -147,7 +178,7 @@ describe('Audit Trail Database Immutability & Shared Writer', () => {
         actorType: 'user',
         actorId: 'support-supervisor',
         action: 'order.address_corrected',
-        entityType: 'order',
+        entityType: 'buyer_order',
         entityId,
         previousValue: { postalCode: '2222222222' },
         newValue: { postalCode: '3333333333' },
@@ -158,7 +189,7 @@ describe('Audit Trail Database Immutability & Shared Writer', () => {
       expect(correctiveEvent.linkedEventId).toBe(initialEvent.id);
 
       // Query entity timeline
-      const timeline = await findAuditEventsByEntity(pool, 'order', entityId, { order: 'ASC' });
+      const timeline = await findAuditEventsByEntity(pool, 'buyer_order', entityId);
       expect(timeline).toHaveLength(2);
       expect(timeline[0]?.id).toBe(initialEvent.id);
       expect(timeline[1]?.id).toBe(correctiveEvent.id);
