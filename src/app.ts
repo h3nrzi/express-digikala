@@ -14,18 +14,25 @@ import { createAdminRouter, createIdentityRouter } from './modules/identity/rout
 import { type SmsSenderPort, InMemorySmsSender } from './modules/identity/ports/sms-sender.js';
 import { SellerService } from './modules/seller/service.js';
 import { createSellerAdminRouter } from './modules/seller/routes.js';
+import {
+  CatalogService,
+  createCatalogAdminRouter,
+  createCatalogPublicRouter,
+} from './modules/catalog/index.js';
 
 export interface AppDependencies {
   pool: Pool;
   config: AppConfig;
   smsSender?: SmsSenderPort;
   sellerService?: SellerService;
+  catalogService?: CatalogService;
 }
 
 export interface AppContext {
   app: Express;
   identityService: IdentityService;
   sellerService: SellerService;
+  catalogService: CatalogService;
   smsSender: SmsSenderPort;
 }
 
@@ -46,6 +53,7 @@ export function createApp(deps: AppDependencies): AppContext {
     otpRateLimitWindowSeconds: deps.config.otpRateLimitWindowSeconds,
   });
   const sellerService = deps.sellerService ?? new SellerService(deps.pool);
+  const catalogService = deps.catalogService ?? new CatalogService(deps.pool);
 
   const requireBuyerAuth = createAuthMiddleware(deps.config.jwtSecret);
   const requireInternalAuth = createInternalAuthMiddleware(identityService);
@@ -62,10 +70,16 @@ export function createApp(deps: AppDependencies): AppContext {
   const adminRouter = createAdminRouter(identityService, requireInternalAuth, requireAccessAdmin);
   const sellerRouter = createSellerAdminRouter(sellerService, requireInternalAuth);
   adminRouter.use('/sellers', sellerRouter);
+
+  const catalogAdminRouter = createCatalogAdminRouter(catalogService, requireInternalAuth);
+  adminRouter.use('/catalog', catalogAdminRouter);
   app.use('/api/v1/admin', adminRouter);
 
   // Public catalog router (unauthenticated)
   const catalogRouter = express.Router();
+  const catalogPublicRouter = createCatalogPublicRouter(catalogService);
+  catalogRouter.use(catalogPublicRouter);
+
   catalogRouter.get('/variants/:variantId/offers', async (req, res, next) => {
     try {
       const rawVariantId = req.params['variantId'];
@@ -121,6 +135,7 @@ export function createApp(deps: AppDependencies): AppContext {
     app,
     identityService,
     sellerService,
+    catalogService,
     smsSender,
   };
 }
