@@ -10,8 +10,14 @@ import { InvalidStateTransitionError } from '../../src/errors.js';
 
 describe('Seller Lifecycle State Machine (Unit)', () => {
   describe('Status definitions and type guard', () => {
-    it('defines exactly the 4 allowed statuses in the MVP lifecycle', () => {
-      expect(SELLER_STATUSES).toEqual(['pending-review', 'under-review', 'active', 'rejected']);
+    it('defines exactly the allowed statuses in the seller lifecycle', () => {
+      expect(SELLER_STATUSES).toEqual([
+        'pending-review',
+        'under-review',
+        'active',
+        'rejected',
+        'suspended',
+      ]);
     });
 
     it('validates known statuses and rejects invalid strings', () => {
@@ -19,8 +25,8 @@ describe('Seller Lifecycle State Machine (Unit)', () => {
       expect(isValidSellerStatus('under-review')).toBe(true);
       expect(isValidSellerStatus('active')).toBe(true);
       expect(isValidSellerStatus('rejected')).toBe(true);
+      expect(isValidSellerStatus('suspended')).toBe(true);
 
-      expect(isValidSellerStatus('suspended')).toBe(false);
       expect(isValidSellerStatus('unknown')).toBe(false);
       expect(isValidSellerStatus('')).toBe(false);
     });

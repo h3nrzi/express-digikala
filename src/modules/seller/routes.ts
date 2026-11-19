@@ -117,5 +117,66 @@ export function createSellerAdminRouter(
     }
   });
 
+  // POST /api/v1/admin/sellers/:id/suspend
+  router.post('/:id/suspend', async (req: Request, res: Response, next) => {
+    try {
+      const id = parseSellerId(req);
+
+      const { reason } = req.body ?? {};
+      if (typeof reason !== 'string' || !reason.trim()) {
+        throw new ValidationError('علت تعلیق فروشنده الزامی است.', [
+          { field: 'reason', message: 'علت تعلیق الزامی است.' },
+        ]);
+      }
+
+      const internalUser = req.internalUser ?? (req.user as InternalSessionUser | undefined);
+      if (!internalUser) {
+        throw new UnauthorizedError('توکن احراز هویت ارسال نشده است.');
+      }
+
+      const result = await sellerService.suspendSeller({
+        sellerId: id,
+        actorUserId: internalUser.id,
+        reason: reason.trim(),
+      });
+
+      res.status(200).json({
+        status: 'ok',
+        seller: result.seller,
+        affectedOffersCount: result.affectedOffersCount,
+      });
+    } catch (err) {
+      next(err);
+    }
+  });
+
+  // POST /api/v1/admin/sellers/:id/reinstate
+  router.post('/:id/reinstate', async (req: Request, res: Response, next) => {
+    try {
+      const id = parseSellerId(req);
+
+      const { reason } = req.body ?? {};
+
+      const internalUser = req.internalUser ?? (req.user as InternalSessionUser | undefined);
+      if (!internalUser) {
+        throw new UnauthorizedError('توکن احراز هویت ارسال نشده است.');
+      }
+
+      const result = await sellerService.reinstateSeller({
+        sellerId: id,
+        actorUserId: internalUser.id,
+        reason: typeof reason === 'string' ? reason.trim() : undefined,
+      });
+
+      res.status(200).json({
+        status: 'ok',
+        seller: result.seller,
+        affectedOffersCount: result.affectedOffersCount,
+      });
+    } catch (err) {
+      next(err);
+    }
+  });
+
   return router;
 }

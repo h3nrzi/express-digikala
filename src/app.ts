@@ -1,6 +1,7 @@
 import express, { type Express } from 'express';
 import type { Pool } from 'pg';
 import type { AppConfig } from './config/index.js';
+import { ValidationError } from './errors.js';
 import { errorHandler } from './middleware/error.js';
 import { traceMiddleware } from './middleware/trace.js';
 import {
@@ -36,8 +37,7 @@ export function createApp(deps: AppDependencies): AppContext {
   app.use(traceMiddleware);
 
   // Initialize ports and services
-  const smsSender =
-    deps.smsSender ?? new InMemorySmsSender(deps.config.nodeEnv === 'development');
+  const smsSender = deps.smsSender ?? new InMemorySmsSender(deps.config.nodeEnv === 'development');
   const identityService = new IdentityService(deps.pool, smsSender, {
     jwtSecret: deps.config.jwtSecret,
     jwtExpiresIn: deps.config.jwtExpiresIn,
@@ -63,6 +63,56 @@ export function createApp(deps: AppDependencies): AppContext {
   const sellerRouter = createSellerAdminRouter(sellerService, requireInternalAuth);
   adminRouter.use('/sellers', sellerRouter);
   app.use('/api/v1/admin', adminRouter);
+
+  // Public catalog router (unauthenticated)
+  const catalogRouter = express.Router();
+  catalogRouter.get('/variants/:variantId/offers', async (req, res, next) => {
+    try {
+      const rawVariantId = req.params['variantId'];
+      const variantId = Array.isArray(rawVariantId) ? rawVariantId[0] : rawVariantId;
+      if (!variantId) {
+        throw new ValidationError('شناسه گونه کالا الزامی است.', [
+          { field: 'variantId', message: 'شناسه گونه کالا الزامی است.' },
+        ]);
+      }
+      const offers = await sellerService.getPublicOffersForVariant(variantId);
+      res.status(200).json({
+        status: 'ok',
+        variantId,
+        offers,
+      });
+    } catch (err) {
+      next(err);
+    }
+  });
+  app.use('/api/v1/catalog', catalogRouter);
+
+  // Shopping cart router (buyer auth protected)
+  const cartRouter = express.Router();
+  cartRouter.put('/lines/:offerId', requireBuyerAuth, async (req, res, next) => {
+    try {
+      const rawOfferId = req.params['offerId'];
+      const offerId = Array.isArray(rawOfferId) ? rawOfferId[0] : rawOfferId;
+      if (!offerId) {
+        throw new ValidationError('شناسه پیشنهاد الزامی است.', [
+          { field: 'offerId', message: 'شناسه پیشنهاد الزامی است.' },
+        ]);
+      }
+      const offer = await sellerService.assertOfferPurchasableForCart(offerId);
+      res.status(200).json({
+        status: 'ok',
+        line: {
+          offerId: offer.id,
+          sellerId: offer.sellerId,
+          variantId: offer.variantId,
+          price: offer.price,
+        },
+      });
+    } catch (err) {
+      next(err);
+    }
+  });
+  app.use('/api/v1/cart', cartRouter);
 
   // Global structured error handler
   app.use(errorHandler);
