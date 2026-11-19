@@ -36,7 +36,8 @@ export function createApp(deps: AppDependencies): AppContext {
   app.use(traceMiddleware);
 
   // Initialize ports and services
-  const smsSender = deps.smsSender ?? new InMemorySmsSender();
+  const smsSender =
+    deps.smsSender ?? new InMemorySmsSender(deps.config.nodeEnv === 'development');
   const identityService = new IdentityService(deps.pool, smsSender, {
     jwtSecret: deps.config.jwtSecret,
     jwtExpiresIn: deps.config.jwtExpiresIn,

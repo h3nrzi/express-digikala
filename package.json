@@ -4,6 +4,8 @@
   "description": "Modular-monolith REST API backend for an Iranian physical-goods ecommerce marketplace",
   "type": "module",
   "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "bootstrap:admin": "tsx src/scripts/bootstrap-admin.ts",
     "build": "tsc -p tsconfig.build.json",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
