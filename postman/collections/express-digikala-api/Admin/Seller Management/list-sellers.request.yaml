@@ -11,5 +11,5 @@ auth:
 queryParams:
   - key: status
     value: ''
-    description: 'Optional. One of: pending-review, under-review, active, rejected'
+    description: 'Optional. One of: pending-review, under-review, active, rejected, suspended'
     disabled: true

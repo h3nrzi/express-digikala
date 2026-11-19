@@ -1,12 +1,12 @@
 $kind: http-request
 name: Invite Operational User
 method: POST
-url: "{{base_url}}/api/v1/admin/users/invite"
+url: '{{base_url}}/api/v1/admin/users/invite'
 order: 1000
 auth:
   type: bearer
   credentials:
-    token: "{{admin_token}}"
+    token: '{{admin_token}}'
 headers:
   Content-Type: application/json
 body:

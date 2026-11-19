@@ -1,0 +1,19 @@
+$kind: http-request
+name: Suspend Seller
+method: POST
+url: '{{base_url}}/api/v1/admin/sellers/{{seller_id}}/suspend'
+order: 5000
+auth:
+  type: bearer
+  credentials:
+    - key: token
+      value: '{{admin_token}}'
+headers:
+  - key: Content-Type
+    value: application/json
+body:
+  type: json
+  content: |-
+    {
+      "reason": "گزارش تخلف در اصالت کالا و نقض سیاست‌های پلتفرم"
+    }

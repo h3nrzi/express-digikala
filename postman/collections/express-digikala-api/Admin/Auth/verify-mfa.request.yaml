@@ -1,7 +1,7 @@
 $kind: http-request
 name: Verify MFA
 method: POST
-url: "{{base_url}}/api/v1/admin/auth/mfa/verify"
+url: '{{base_url}}/api/v1/admin/auth/mfa/verify'
 order: 3000
 auth:
   type: noauth

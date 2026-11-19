@@ -15,3 +15,7 @@ variables:
     value: ''
   - key: seller_id
     value: ''
+  - key: variant_id
+    value: ''
+  - key: offer_id
+    value: ''
