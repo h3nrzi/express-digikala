@@ -1,0 +1,22 @@
+$kind: http-request
+name: Invite Operational User
+method: POST
+url: '{{base_url}}/api/v1/admin/users/invite'
+order: 1000
+auth:
+  type: bearer
+  credentials:
+    - key: token
+      value: '{{admin_token}}'
+headers:
+  - key: Content-Type
+    value: application/json
+body:
+  type: json
+  content: |-
+    {
+      "email": "user@example.com",
+      "phone": "09123456789",
+      "roles": ["seller-mgmt"],
+      "fullName": "New User"
+    }

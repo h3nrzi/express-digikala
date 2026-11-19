@@ -1,0 +1,24 @@
+$kind: http-request
+name: Create Seller
+method: POST
+url: '{{base_url}}/api/v1/admin/sellers'
+order: 1000
+auth:
+  type: bearer
+  credentials:
+    - key: token
+      value: '{{admin_token}}'
+headers:
+  - key: Content-Type
+    value: application/json
+body:
+  type: json
+  content: |-
+    {
+      "name": "My Shop",
+      "taxpayerId": "1234567890",
+      "contact": {
+        "email": "shop@example.com",
+        "phone": "09123456789"
+      }
+    }

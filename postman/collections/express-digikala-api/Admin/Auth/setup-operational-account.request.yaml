@@ -1,0 +1,18 @@
+$kind: http-request
+name: Setup Operational Account
+method: POST
+url: '{{base_url}}/api/v1/admin/auth/setup'
+order: 1000
+auth:
+  type: noauth
+headers:
+  - key: Content-Type
+    value: application/json
+body:
+  type: json
+  content: |-
+    {
+      "token": "{{invite_token}}",
+      "password": "StrongPass123!",
+      "fullName": "Admin User"
+    }

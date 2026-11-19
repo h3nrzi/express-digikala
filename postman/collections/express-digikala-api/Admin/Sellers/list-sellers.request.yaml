@@ -1,0 +1,15 @@
+$kind: http-request
+name: List Sellers
+method: GET
+url: '{{base_url}}/api/v1/admin/sellers'
+order: 2000
+auth:
+  type: bearer
+  credentials:
+    - key: token
+      value: '{{admin_token}}'
+queryParams:
+  - key: status
+    value: ''
+    description: 'Optional. One of: pending-review, under-review, active, rejected'
+    disabled: true

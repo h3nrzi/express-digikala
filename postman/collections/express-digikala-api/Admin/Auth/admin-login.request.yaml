@@ -1,0 +1,17 @@
+$kind: http-request
+name: Admin Login
+method: POST
+url: '{{base_url}}/api/v1/admin/auth/login'
+order: 2000
+auth:
+  type: noauth
+headers:
+  - key: Content-Type
+    value: application/json
+body:
+  type: json
+  content: |-
+    {
+      "email": "admin@example.com",
+      "password": "StrongPass123!"
+    }

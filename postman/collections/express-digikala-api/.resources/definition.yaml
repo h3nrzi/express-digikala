@@ -1,0 +1,17 @@
+$kind: collection
+name: Express Digikala API
+variables:
+  - key: base_url
+    value: 'http://localhost:3000'
+  - key: buyer_token
+    value: ''
+  - key: admin_token
+    value: ''
+  - key: invite_token
+    value: ''
+  - key: session_token
+    value: ''
+  - key: user_id
+    value: ''
+  - key: seller_id
+    value: ''
